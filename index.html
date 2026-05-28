@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DarkSpot - Monitoramento de São Vicente</title>
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <title>DarkSpot - Painel Operacional</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
+        :root {
+            --bg-primary: #030712;       
+            --bg-surface: #0b1528;       
+            --accent-blue: #1d4ed8;      
+            --accent-yellow: #f59e0b;    
+            --text-main: #f8fafc;        
+            --text-muted: #94a3b8;
+            
+            --color-baixo: #10b981;
+            --color-moderado: #f59e0b;
+            --color-critico: #ef4444;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
 
         body {
-            background-color: #121212;
-            color: #fff;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
             display: flex;
             flex-direction: column;
             height: 100vh;
@@ -25,103 +39,195 @@
         }
 
         header {
-            background-color: #1e1e1e;
-            padding: 15px;
-            text-align: center;
-            border-bottom: 2px solid #ff4a4a;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background: rgba(11, 21, 40, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 0.8rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid rgba(29, 78, 216, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            z-index: 2000;
+        }
+
+        @media (min-width: 768px) {
+            header {
+                flex-direction: row;
+                padding: 0.8rem 2.5rem;
+            }
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            height: 45px; 
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 8px rgba(29, 78, 216, 0.5));
         }
 
         header h1 {
             font-size: 22px;
-            color: #ff4a4a;
-            letter-spacing: 1px;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        header h1 span {
+            color: var(--accent-blue);
         }
 
         header p {
-            font-size: 13px;
-            color: #aaa;
-            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+            background: rgba(3, 7, 18, 0.6);
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            text-align: center;
         }
 
         #map-container {
             flex: 1;
             position: relative;
+            width: 100%;
         }
 
         #map {
             width: 100%;
             height: 100%;
+            background-color: var(--bg-primary);
         }
 
-        /* Legenda Flutuante do TCC */
         .legenda {
             position: absolute;
-            bottom: 30px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(20, 20, 20, 0.95);
-            padding: 12px 25px;
+            background: rgba(11, 21, 40, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 12px 24px;
             border-radius: 30px;
             display: flex;
-            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
             z-index: 1000;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
-            border: 1px solid #333;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(29, 78, 216, 0.2);
+            width: 90%;
+            max-width: 500px;
+        }
+
+        @media (min-width: 480px) {
+            .legenda { width: auto; }
         }
 
         .legenda-item {
             display: flex;
             align-items: center;
             gap: 10px;
-            font-size: 13px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-main);
         }
 
         .circulo {
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
             display: inline-block;
         }
 
-        .verde { background-color: #00ff00; box-shadow: 0 0 10px #00ff00; }
-        .amarelo { background-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
-        .vermelho { background-color: #ff0000; box-shadow: 0 0 10px #ff0000; }
+        .verde { background-color: var(--color-baixo); box-shadow: 0 0 10px var(--color-baixo); }
+        .amarelo { background-color: var(--color-moderado); box-shadow: 0 0 10px var(--color-moderado); }
+        .vermelho { background-color: var(--color-critico); box-shadow: 0 0 10px var(--color-critico); }
 
-        /* Customização dos balões de clique para o Modo Escuro */
+        /* Estilização dos Balões Informativos (Popups) */
         .leaflet-popup-content-wrapper {
-            background-color: #1e1e1e !important;
-            color: #fff !important;
-            border: 1px solid #ff4a4a;
-            border-radius: 8px;
+            background: var(--bg-surface) !important;
+            backdrop-filter: blur(12px);
+            color: var(--text-main) !important;
+            border-radius: 14px !important;
+            padding: 4px !important;
+            box-shadow: 0 25px 40px rgba(0, 0, 0, 0.7) !important;
         }
-        .leaflet-popup-tip { background-color: #1e1e1e !important; }
-        .popup-titulo { font-weight: bold; color: #ff4a4a; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 3px; }
+        
+        .popup-baixo { border: 1.5px solid var(--color-baixo); }
+        .popup-moderado { border: 1.5px solid var(--color-moderado); }
+        .popup-critico { border: 1.5px solid var(--color-critico); }
+
+        .leaflet-popup-tip { background: var(--bg-surface) !important; }
+        
+        .popup-container {
+            padding: 10px;
+            min-width: 240px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .popup-titulo { 
+            font-size: 14px;
+            font-weight: 800; 
+            margin-bottom: 10px; 
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
+            padding-bottom: 6px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .popup-titulo.b { color: var(--color-baixo); }
+        .popup-titulo.m { color: var(--color-moderado); }
+        .popup-titulo.c { color: var(--color-critico); }
+
+        .popup-container b {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .caixa-melhoria {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border-left: 3px solid var(--accent-blue);
+            border-radius: 4px;
+            font-size: 12px;
+            color: #e2e8f0;
+        }
+        
+        .caixa-melhoria strong {
+            color: var(--accent-yellow);
+            display: block;
+            margin-bottom: 2px;
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>DARKSPOT - MONITORAMENTO ONLINE</h1>
-        <p id="status-conexao">Conectando ao Firebase...</p>
+        <div class="brand-container">
+            <img src="image_e716e2.png" alt="DarkSpot Logo" class="brand-logo" onerror="this.style.display='none';">
+            <h1>Dark<span>Spot</span></h1>
+        </div>
+        <p id="status-conexao">Conectando ao banco de dados...</p>
     </header>
 
     <div id="map-container">
         <div id="map"></div>
 
         <div class="legenda">
-            <div class="legenda-item">
-                <span class="circulo verde"></span>
-                <span>Baixo (Até 3)</span>
-            </div>
-            <div class="legenda-item">
-                <span class="circulo amarelo"></span>
-                <span>Moderado (4 a 5)</span>
-            </div>
-            <div class="legenda-item">
-                <span class="circulo vermelho"></span>
-                <span>Alto (Mais de 5)</span>
-            </div>
+            <div class="legenda-item"><span class="circulo verde"></span><span>Baixo (≤ 3)</span></div>
+            <div class="legenda-item"><span class="circulo amarelo"></span><span>Moderado (≤ 5)</span></div>
+            <div class="legenda-item"><span class="circulo vermelho"></span><span>Crítico (> 8)</span></div>
         </div>
     </div>
 
@@ -132,7 +238,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-        // CREDENCIAIS REAIS DO SEU BANCO
         const firebaseConfig = {
             apiKey: "AIzaSyAnLJGal3lGflJELCQpC8OhCKQXTnHSWLc",
             authDomain: "darkspot-bd.firebaseapp.com",
@@ -142,41 +247,54 @@
             appId: "1:814754623005:web:94fb38a572712c06b560f4"
         };
 
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+
         try {
             const app = initializeApp(firebaseConfig);
             const db = getFirestore(app);
 
-            // Inicializa o mapa focado em São Vicente
-            const map = L.map('map').setView([-23.9551, -46.3974], 14);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+            const map = L.map('map', { 
+                zoomControl: false,
+                preferCanvas: false // Desativado Canvas para forçar a renderização em camadas DOM (melhora detecção de clique)
+            }).setView([-23.9551, -46.3974], 14);
+            
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 18,
+                minZoom: 11
+            }).addTo(map);
 
             let camadaCalor = null;
+            
+            // CORREÇÃO: Forçando os marcadores invisíveis a ficarem na frente (z-index maior)
             let marcadoresClique = L.layerGroup().addTo(map);
 
-            // ALTERADO: Apontando diretamente para a coleção correta 'ocorrencias'
             onSnapshot(collection(db, "ocorrencias"), (snapshot) => {
                 const listaOcorrencias = [];
-                
-                document.getElementById("status-conexao").innerText = `Conectado! Registros achados no banco: ${snapshot.size}`;
-                console.log("Total de documentos brutos lidos do Firebase:", snapshot.size);
+                document.getElementById("status-conexao").innerText = `Painel Ativo • Registros Computados: ${snapshot.size}`;
 
                 snapshot.forEach((doc) => {
                     const dados = doc.data();
-                    
                     if (dados.localizacao && dados.localizacao.latitude) {
                         listaOcorrencias.push({
                             lat: dados.localizacao.latitude,
                             lng: dados.localizacao.longitude,
-                            descricao: dados.descricao || "Não informada",
-                            periodo: dados.periodo || "Não informado"
+                            descricao: escapeHTML(dados.descricao || "Furtos diversos na região"),
+                            periodo: escapeHTML(dados.periodo || "Não informado")
                         });
                     }
                 });
 
-                processarEExibirMapa(listaOcorrencias);
+                requestAnimationFrame(() => {
+                    processarEExibirMapa(listaOcorrencias);
+                });
             }, (erro) => {
-                console.error("Erro de permissão do Firebase:", erro);
-                document.getElementById("status-conexao").innerText = "Erro de Permissão! Verifique as regras do Firestore.";
+                document.getElementById("status-conexao").innerText = "Erro na sincronização de dados.";
             });
 
             function processarEExibirMapa(ocorrencias) {
@@ -185,7 +303,6 @@
 
                 if (ocorrencias.length === 0) return;
 
-                // Algoritmo de análise por proximidade (Quadras)
                 const agrupamento = {};
                 ocorrencias.forEach(item => {
                     const chaveRegiao = item.lat.toFixed(3) + ',' + item.lng.toFixed(3);
@@ -199,15 +316,45 @@
                     const listaDeCrimes = agrupamento[chave];
                     const quantidade = listaDeCrimes.length;
                     
-                    let pesoIntensidade = 0.2; // Verde (Até 3)
-                    let statusTexto = "Baixo Risco";
-                    
-                    if (quantidade > 3 && quantidade <= 5) {
-                        pesoIntensidade = 0.6; // Amarelo
-                        statusTexto = "Risco Moderado";
-                    } else if (quantidade > 5) {
-                        pesoIntensidade = 1.0; // Vermelho
-                        statusTexto = "Zona Crítica / Alto Risco";
+                    let pesoIntensidade = 0.2;
+                    let statusTexto = "Área de Baixo Risco";
+                    let classeTema = "b";
+                    let classePopup = "popup-baixo";
+                    let recomendacao = "";
+
+                    const contagemPeriodos = {};
+                    listaDeCrimes.forEach(c => {
+                        contagemPeriodos[c.periodo] = (contagemPeriodos[c.periodo] || 0) + 1;
+                    });
+                    let periodoMaisFrequente = Object.keys(contagemPeriodos).reduce((a, b) => contagemPeriodos[a] > contagemPeriodos[b] ? a : b);
+
+                    if (quantidade <= 3) {
+                        pesoIntensidade = 0.2;
+                        statusTexto = "Área de Baixo Risco";
+                        classeTema = "b";
+                        classePopup = "popup-baixo";
+                        recomendacao = "Manter atenção rotineira básica ao trafegar portando objetos de valor visíveis.";
+                    } 
+                    else if (quantidade <= 5) {
+                        pesoIntensidade = 0.5;
+                        statusTexto = "Atenção: Risco Moderado";
+                        classeTema = "m";
+                        classePopup = "popup-moderado";
+                        recomendacao = "Recomenda-se evitar rotas isoladas ou caminhar sozinho nesta área durante o período mapeado.";
+                    } 
+                    else if (quantidade > 8) {
+                        pesoIntensidade = 1.0;
+                        statusTexto = "Alerta: Zona Crítica";
+                        classeTema = "c";
+                        classePopup = "popup-critico";
+                        recomendacao = "ZONAS RECORRENTES: Alto índice de reincidência. Sugere-se reforço de policiamento e iluminação pública.";
+                    }
+                    else {
+                        pesoIntensidade = 0.75;
+                        statusTexto = "Risco Elevado";
+                        classeTema = "c";
+                        classePopup = "popup-critico";
+                        recomendacao = "Evitar paradas prolongadas em veículos ou pontos de ônibus sem movimentação comercial ativa.";
                     }
 
                     const centroLat = listaDeCrimes[0].lat;
@@ -215,40 +362,60 @@
 
                     pontosDeCalor.push([centroLat, centroLng, pesoIntensidade]);
 
-                    // Marcador invisível para detectar o clique por cima do borrão
+                    // CORREÇÃO: Aumentado o raio de colisão do clique para 35 e adicionada borda ativa invisível para facilitar o toque
                     const areaClicavel = L.circleMarker([centroLat, centroLng], {
-                        radius: 25,
-                        fillColor: 'transparent',
-                        color: 'transparent',
+                        radius: 35,                     // Aumentado para cobrir toda a mancha de calor
+                        fillColor: '#000',
+                        fillOpacity: 0.0,               // Totalmente transparente por dentro
+                        color: 'transparent',           
+                        weight: 5,                      // Área extra de aproximação
                         interactive: true
                     }).addTo(marcadoresClique);
 
-                    // CORRIGIDO: Estrutura de interpolação limpa para rodar direto no navegador
+                    // CORREÇÃO: Forçar o cursor do mouse a virar "mãozinha" ao passar sobre a mancha
+                    areaClicavel.on('mouseover', function() {
+                        this.getElement().style.cursor = 'pointer';
+                    });
+
                     const conteudoPopup = `
-                        <div class="popup-titulo">${statusTexto}</div>
-                        <b>Descrição Local:</b> ${listaDeCrimes[0].descricao}<br>
-                        <b>Total de Furtos na Área:</b> ${quantidade}<br>
-                        <b>Período Comum:</b> ${listaDeCrimes[0].periodo}
+                        <div class="popup-container">
+                            <div class="popup-titulo ${classeTema}">${statusTexto}</div>
+                            <b>Total de Registros:</b> <span style="color:var(--text-main); font-weight:700;">${quantidade} casos</span><br>
+                            <b>Período Crítico:</b> <span style="color:var(--accent-yellow); font-weight:600;">${periodoMaisFrequente}</span><br>
+                            <b>Último Alerta:</b> ${listaDeCrimes[0].descricao}<br>
+                            
+                            <div class="caixa-melhoria">
+                                <strong>Sugestão de Prevenção / Melhoria:</strong>
+                                ${recomendacao}
+                            </div>
+                        </div>
                     `;
 
-                    areaClicavel.bindPopup(conteudoPopup);
+                    areaClicavel.bindPopup(conteudoPopup, { 
+                        className: classePopup,
+                        closeButton: false,
+                        autoPan: true 
+                    });
                 }
 
-                // Desenha as manchas de calor usando o gradiente do TCC
+                // A camada de calor é desenhada abaixo dos marcadores clicáveis
                 camadaCalor = L.heatLayer(pontosDeCalor, {
-                    radius: 35,
-                    blur: 20,
-                    maxZoom: 15,
+                    radius: 40,
+                    blur: 25,
+                    maxZoom: 16,
                     gradient: {
-                        0.2: 'green',
-                        0.6: 'yellow',
-                        1.0: 'red'
+                        0.2: '#10b981', 
+                        0.5: '#f59e0b', 
+                        1.0: '#ef4444'  
                     }
                 }).addTo(map);
+
+                // Garante a ordem: Marcadores de clique sempre em cima da pintura térmica
+                marcadoresClique.bringToFront();
             }
 
         } catch (e) {
-            console.error("Erro crítico de inicialização do mapa:", e);
+            console.error(e);
         }
     </script>
 </body>
