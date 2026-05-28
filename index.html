@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DarkSpot - Monitoramento de São Vicente</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #1e1e1e;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 2px solid #ff4a4a;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        header h1 {
+            font-size: 22px;
+            color: #ff4a4a;
+            letter-spacing: 1px;
+        }
+
+        header p {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        #map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Legenda Flutuante do TCC */
+        .legenda {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(20, 20, 20, 0.95);
+            padding: 12px 25px;
+            border-radius: 30px;
+            display: flex;
+            gap: 25px;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+            border: 1px solid #333;
+        }
+
+        .legenda-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .circulo {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .verde { background-color: #00ff00; box-shadow: 0 0 10px #00ff00; }
+        .amarelo { background-color: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        .vermelho { background-color: #ff0000; box-shadow: 0 0 10px #ff0000; }
+
+        /* Customização dos balões de clique para o Modo Escuro */
+        .leaflet-popup-content-wrapper {
+            background-color: #1e1e1e !important;
+            color: #fff !important;
+            border: 1px solid #ff4a4a;
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip { background-color: #1e1e1e !important; }
+        .popup-titulo { font-weight: bold; color: #ff4a4a; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 3px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DARKSPOT - MONITORAMENTO ONLINE</h1>
+        <p id="status-conexao">Conectando ao Firebase...</p>
+    </header>
+
+    <div id="map-container">
+        <div id="map"></div>
+
+        <div class="legenda">
+            <div class="legenda-item">
+                <span class="circulo verde"></span>
+                <span>Baixo (Até 3)</span>
+            </div>
+            <div class="legenda-item">
+                <span class="circulo amarelo"></span>
+                <span>Moderado (4 a 5)</span>
+            </div>
+            <div class="legenda-item">
+                <span class="circulo vermelho"></span>
+                <span>Alto (Mais de 5)</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+        // CREDENCIAIS REAIS DO SEU BANCO
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnLJGal3lGflJELCQpC8OhCKQXTnHSWLc",
+            authDomain: "darkspot-bd.firebaseapp.com",
+            projectId: "darkspot-bd",
+            storageBucket: "darkspot-bd.firebasestorage.app",
+            messagingSenderId: "814754623005",
+            appId: "1:814754623005:web:94fb38a572712c06b560f4"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+
+            // Inicializa o mapa focado em São Vicente
+            const map = L.map('map').setView([-23.9551, -46.3974], 14);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+            let camadaCalor = null;
+            let marcadoresClique = L.layerGroup().addTo(map);
+
+            // ALTERADO: Apontando diretamente para a coleção correta 'ocorrencias'
+            onSnapshot(collection(db, "ocorrencias"), (snapshot) => {
+                const listaOcorrencias = [];
+                
+                document.getElementById("status-conexao").innerText = `Conectado! Registros achados no banco: ${snapshot.size}`;
+                console.log("Total de documentos brutos lidos do Firebase:", snapshot.size);
+
+                snapshot.forEach((doc) => {
+                    const dados = doc.data();
+                    
+                    if (dados.localizacao && dados.localizacao.latitude) {
+                        listaOcorrencias.push({
+                            lat: dados.localizacao.latitude,
+                            lng: dados.localizacao.longitude,
+                            descricao: dados.descricao || "Não informada",
+                            periodo: dados.periodo || "Não informado"
+                        });
+                    }
+                });
+
+                processarEExibirMapa(listaOcorrencias);
+            }, (erro) => {
+                console.error("Erro de permissão do Firebase:", erro);
+                document.getElementById("status-conexao").innerText = "Erro de Permissão! Verifique as regras do Firestore.";
+            });
+
+            function processarEExibirMapa(ocorrencias) {
+                if (camadaCalor) map.removeLayer(camadaCalor);
+                marcadoresClique.clearLayers();
+
+                if (ocorrencias.length === 0) return;
+
+                // Algoritmo de análise por proximidade (Quadras)
+                const agrupamento = {};
+                ocorrencias.forEach(item => {
+                    const chaveRegiao = item.lat.toFixed(3) + ',' + item.lng.toFixed(3);
+                    if (!agrupamento[chaveRegiao]) agrupamento[chaveRegiao] = [];
+                    agrupamento[chaveRegiao].push(item);
+                });
+
+                const pontosDeCalor = [];
+
+                for (let chave in agrupamento) {
+                    const listaDeCrimes = agrupamento[chave];
+                    const quantidade = listaDeCrimes.length;
+                    
+                    let pesoIntensidade = 0.2; // Verde (Até 3)
+                    let statusTexto = "Baixo Risco";
+                    
+                    if (quantidade > 3 && quantidade <= 5) {
+                        pesoIntensidade = 0.6; // Amarelo
+                        statusTexto = "Risco Moderado";
+                    } else if (quantidade > 5) {
+                        pesoIntensidade = 1.0; // Vermelho
+                        statusTexto = "Zona Crítica / Alto Risco";
+                    }
+
+                    const centroLat = listaDeCrimes[0].lat;
+                    const centroLng = listaDeCrimes[0].lng;
+
+                    pontosDeCalor.push([centroLat, centroLng, pesoIntensidade]);
+
+                    // Marcador invisível para detectar o clique por cima do borrão
+                    const areaClicavel = L.circleMarker([centroLat, centroLng], {
+                        radius: 25,
+                        fillColor: 'transparent',
+                        color: 'transparent',
+                        interactive: true
+                    }).addTo(marcadoresClique);
+
+                    // CORRIGIDO: Estrutura de interpolação limpa para rodar direto no navegador
+                    const conteudoPopup = `
+                        <div class="popup-titulo">${statusTexto}</div>
+                        <b>Descrição Local:</b> ${listaDeCrimes[0].descricao}<br>
+                        <b>Total de Furtos na Área:</b> ${quantidade}<br>
+                        <b>Período Comum:</b> ${listaDeCrimes[0].periodo}
+                    `;
+
+                    areaClicavel.bindPopup(conteudoPopup);
+                }
+
+                // Desenha as manchas de calor usando o gradiente do TCC
+                camadaCalor = L.heatLayer(pontosDeCalor, {
+                    radius: 35,
+                    blur: 20,
+                    maxZoom: 15,
+                    gradient: {
+                        0.2: 'green',
+                        0.6: 'yellow',
+                        1.0: 'red'
+                    }
+                }).addTo(map);
+            }
+
+        } catch (e) {
+            console.error("Erro crítico de inicialização do mapa:", e);
+        }
+    </script>
+</body>
+</html>
